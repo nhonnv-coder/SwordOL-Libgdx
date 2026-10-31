@@ -5,6 +5,8 @@ import static org.junit.Assert.*;
 import java.util.Arrays;
 import java.util.concurrent.*;
 import org.junit.Test;
+import vn.swordol.protocol.wire.LoginPackets;
+import vn.swordol.protocol.wire.RoleLooks;
 import vn.swordol.server.gateway.GatewayServer;
 
 public class GameSessionTest {
@@ -184,6 +186,78 @@ public class GameSessionTest {
       release.countDown();
       server.stop(0);
     }
+  }
+
+  @Test
+  public void createsACharacterOnTheGatewayAndSeesItInTheRoleList() throws Exception {
+    GatewayServer.Account account =
+        new GatewayServer.Account(
+            7,
+            "fixture",
+            Arrays.asList(new GatewayServer.Role(42, "Local role", 0, 1101400, "Trung nguyen")));
+    try (GatewayServer server =
+        new GatewayServer((name, password) ->
+            name.equals("fixture") && Arrays.equals(password, "fixture-only".toCharArray())
+                ? account
+                : null)) {
+      server.start();
+      BlockingQueue<GameSession.Snapshot> states = new LinkedBlockingQueue<>();
+      BlockingQueue<Runnable> callbacks = new LinkedBlockingQueue<>();
+      try (GameSession session = new GameSession(callbacks::add, states::add)) {
+        session.loadServers(server.accountEndpoint());
+        GameSession.Snapshot list = await(GameSession.Stage.SERVERS_READY, states, callbacks);
+        session.login(list.servers().get(0), "fixture", "fixture-only".toCharArray());
+        assertEquals(1, await(GameSession.Stage.ROLES_READY, states, callbacks).roles().size());
+
+        session.createRole("Tan Thu", RoleLooks.MALE, 1, 1);
+        GameSession.Snapshot after = awaitRoleCount(2, states, callbacks);
+        LoginPackets.Role created = after.roles().get(1);
+        assertEquals("Tan Thu", created.name());
+        assertEquals(1, created.slot());
+        assertEquals(RoleLooks.lookFace(1, RoleLooks.MALE), created.lookId());
+        assertNotEquals(42, created.id());
+
+        // The created character is a real role: entering it serves a world like any other.
+        session.enter(created.id());
+        await(GameSession.Stage.ENTERING_WORLD, states, callbacks);
+      }
+    }
+  }
+
+  @Test
+  public void refusesToCreateIntoAnOccupiedSlot() throws Exception {
+    GatewayServer.Account account =
+        new GatewayServer.Account(
+            7,
+            "fixture",
+            Arrays.asList(new GatewayServer.Role(42, "Local role", 0, 1101400, "Trung nguyen")));
+    try (GatewayServer server = new GatewayServer((name, password) -> account)) {
+      server.start();
+      BlockingQueue<GameSession.Snapshot> states = new LinkedBlockingQueue<>();
+      BlockingQueue<Runnable> callbacks = new LinkedBlockingQueue<>();
+      try (GameSession session = new GameSession(callbacks::add, states::add)) {
+        session.loadServers(server.accountEndpoint());
+        GameSession.Snapshot list = await(GameSession.Stage.SERVERS_READY, states, callbacks);
+        session.login(list.servers().get(0), "fixture", "fixture-only".toCharArray());
+        await(GameSession.Stage.ROLES_READY, states, callbacks);
+        // Slot 0 already holds a role; the gateway drops the connection rather than overwriting.
+        session.createRole("Tan Thu", RoleLooks.MALE, 1, 0);
+        await(GameSession.Stage.ERROR, states, callbacks);
+      }
+    }
+  }
+
+  private static GameSession.Snapshot awaitRoleCount(
+      int wanted, BlockingQueue<GameSession.Snapshot> states, BlockingQueue<Runnable> callbacks)
+      throws Exception {
+    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+    while (System.nanoTime() < until) {
+      Runnable run = callbacks.poll(50, TimeUnit.MILLISECONDS);
+      if (run != null) run.run();
+      GameSession.Snapshot s;
+      while ((s = states.poll()) != null) if (s.roles().size() == wanted) return s;
+    }
+    throw new AssertionError("Role list never reached " + wanted + " roles");
   }
 
   private static GameSession.Snapshot await(

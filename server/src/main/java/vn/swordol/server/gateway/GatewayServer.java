@@ -204,28 +204,20 @@ public final class GatewayServer implements AutoCloseable {
           || !verified.name.equals(LoginPackets.text(connect, 5)))
         throw new IOException("Gameplay identity rejected");
       owned.setSoTimeout(0);
-      WireWriter list = new WireWriter(1080).signedByte(ticket.account.roles.size());
-      for (Role role : ticket.account.roles) {
-        list.integer(role.id)
-            .integer(1)
-            .integer(100000)
-            .signedByte(0)
-            .shortValue(10)
-            .text(role.name)
-            .signedByte(role.slot);
-        for (int i = 7; i < 30; i++) list.integer(0);
-      }
-      owned.getOutputStream().write(Wire.tcpResponse(list.build()));
-      owned.getOutputStream().flush();
+      sendRoleList(owned, ticket.account);
       while (running && (raw = Wire.readTcpRequest(owned.getInputStream())) != null) {
         Packet command = Wire.logical(raw);
+        if (command.opcode() == 1001) {
+          createRole(owned, ticket.account, command);
+          continue;
+        }
         if (command.opcode() != 1081
             || command.fields().size() != 4
             || LoginPackets.number(command, 1) != 0)
-          throw new IOException("Only enter role supported");
+          throw new IOException("Only enter and create role supported");
         int id = LoginPackets.number(command, 0);
         Role selected = null;
-        for (Role role : ticket.account.roles) if (role.id == id) selected = role;
+        for (Role role : ticket.account.roles()) if (role.id == id) selected = role;
         if (selected == null) throw new IOException("Role ownership rejected");
         if (selected.world == null) {
           byte[] map =
@@ -250,6 +242,46 @@ public final class GatewayServer implements AutoCloseable {
     } finally {
       sockets.remove(socket);
     }
+  }
+
+  /** The character list processLoginRoleCmd reads: a count byte then 30 fields per role. */
+  private void sendRoleList(Socket owned, Account account) throws IOException {
+    List<Role> roles = account.roles();
+    WireWriter list = new WireWriter(1080).signedByte(roles.size());
+    for (Role role : roles) {
+      list.integer(role.id)
+          .integer(1)
+          .integer(role.lookFace)
+          .signedByte(0)
+          .shortValue(10)
+          .text(role.name)
+          .signedByte(role.slot);
+      for (int i = 7; i < 30; i++) list.integer(0);
+    }
+    owned.getOutputStream().write(Wire.tcpResponse(list.build()));
+    owned.getOutputStream().flush();
+  }
+
+  /**
+   * Handles the creation request Business.NewRoleWnd_EditOK sends, then answers with the whole list
+   * again. The look face comes from the creation screen's own table rather than the request, so a
+   * client cannot ask for an appearance the screen does not offer.
+   */
+  private void createRole(Socket owned, Account account, Packet command) throws IOException {
+    if (command.fields().size() != 12) throw new IOException("Invalid create-role schema");
+    String name = LoginPackets.text(command, 0);
+    int sex = LoginPackets.number(command, 1);
+    int profession = (LoginPackets.number(command, 2) - 1) / 10;
+    int slot = LoginPackets.number(command, 7);
+    int lookFace = RoleLooks.lookFace(profession, sex);
+    if (lookFace == 0 || name.trim().isEmpty() || name.length() > LoginPackets.ROLE_NAME_LIMIT)
+      throw new IOException("Create-role rejected");
+    try {
+      account.create(name, slot, lookFace);
+    } catch (IllegalArgumentException ex) {
+      throw new IOException("Create-role rejected");
+    }
+    sendRoleList(owned, account);
   }
 
   /**
@@ -384,20 +416,28 @@ public final class GatewayServer implements AutoCloseable {
   }
 
   public static final class Account {
+    /** The three slots the original SELROLE_WND holds. */
+    static final int SLOTS = 3;
+
     private final int id;
     private final String name;
     private final List<Role> roles;
+    private int nextRoleId;
 
     public Account(int id, String name, List<Role> roles) {
-      if (id <= 0 || name == null || roles.size() > 3)
+      if (id <= 0 || name == null || roles.size() > SLOTS)
         throw new IllegalArgumentException("Invalid local account");
       Set<Integer> slots = new HashSet<>(), ids = new HashSet<>();
-      for (Role role : roles)
+      int highest = 0;
+      for (Role role : roles) {
         if (!slots.add(role.slot) || !ids.add(role.id))
           throw new IllegalArgumentException("Duplicate role");
+        highest = Math.max(highest, role.id);
+      }
       this.id = id;
       this.name = name;
-      this.roles = Collections.unmodifiableList(new ArrayList<>(roles));
+      this.roles = new ArrayList<>(roles);
+      this.nextRoleId = highest + 1;
     }
 
     public int id() {
@@ -407,32 +447,86 @@ public final class GatewayServer implements AutoCloseable {
     public String name() {
       return name;
     }
+
+    /** A snapshot: callers iterate it while another connection may be creating a character. */
+    synchronized List<Role> roles() {
+      return new ArrayList<>(roles);
+    }
+
+    /**
+     * Adds a character the way the creation screen asks for one: into a free slot, with a name no
+     * other role here holds. The new role enters the same world as an existing one, because the
+     * local gateway has no starting map of its own.
+     *
+     * <p>shortcut: the world is copied from the first role that has one, when to upgrade: a local
+     * server that owns a starting map per profession.
+     */
+    synchronized Role create(String name, int slot, int lookFace) {
+      if (roles.size() >= SLOTS) throw new IllegalArgumentException("No free character slot");
+      for (Role role : roles) {
+        if (role.slot == slot) throw new IllegalArgumentException("Slot already holds a character");
+        if (role.name.equals(name)) throw new IllegalArgumentException("Name already taken");
+      }
+      Role template = roles.isEmpty() ? null : roles.get(0);
+      if (template == null) throw new IllegalArgumentException("No world to place a character in");
+      Role created =
+          template.world == null
+              ? new Role(nextRoleId, name, slot, template.mapId, template.mapName, lookFace)
+              : new Role(nextRoleId, name, slot, template.world, lookFace);
+      nextRoleId++;
+      roles.add(created);
+      return created;
+    }
   }
 
   public static final class Role {
-    private final int id, slot, mapId;
+    /** The look the earlier slices announced before characters could be created. */
+    static final int DEFAULT_LOOK_FACE = 100000;
+
+    private final int id, slot, mapId, lookFace;
     private final String name, mapName;
     private final World world;
 
     /** Announces a map only, as the first native slice did. */
     public Role(int id, String name, int slot, int mapId, String mapName) {
-      this(id, name, slot, mapId, mapName, null);
+      this(id, name, slot, mapId, mapName, null, DEFAULT_LOOK_FACE);
+    }
+
+    public Role(int id, String name, int slot, int mapId, String mapName, int lookFace) {
+      this(id, name, slot, mapId, mapName, null, lookFace);
     }
 
     /** Serves a real map: resources, identity, portals, the user entity and authoritative walks. */
     public Role(int id, String name, int slot, World world) {
-      this(id, name, slot, Objects.requireNonNull(world, "world").mapId, world.mapName, world);
+      this(id, name, slot, world, DEFAULT_LOOK_FACE);
     }
 
-    private Role(int id, String name, int slot, int mapId, String mapName, World world) {
-      if (id <= 0 || slot < 0 || slot > 2 || name == null || mapName == null)
-        throw new IllegalArgumentException("Invalid local role");
+    public Role(int id, String name, int slot, World world, int lookFace) {
+      this(
+          id,
+          name,
+          slot,
+          Objects.requireNonNull(world, "world").mapId,
+          world.mapName,
+          world,
+          lookFace);
+    }
+
+    private Role(
+        int id, String name, int slot, int mapId, String mapName, World world, int lookFace) {
+      if (id <= 0
+          || slot < 0
+          || slot >= Account.SLOTS
+          || name == null
+          || mapName == null
+          || lookFace <= 0) throw new IllegalArgumentException("Invalid local role");
       this.id = id;
       this.name = name;
       this.slot = slot;
       this.mapId = mapId;
       this.mapName = mapName;
       this.world = world;
+      this.lookFace = lookFace;
     }
   }
 

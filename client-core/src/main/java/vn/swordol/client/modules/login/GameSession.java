@@ -52,7 +52,8 @@ public final class GameSession implements AutoCloseable {
   private char[] pendingPassword;
   private Stage stage = Stage.DISCONNECTED;
   private String status = "Chưa kết nối", mapName = "";
-  private int mapId, sessionId, random, key = 1, enteredRole;
+  private int mapId, sessionId, random, key = 1, enteredRole, serverLine;
+  private LoginPackets.Handoff handoff;
   private long stateSince = System.nanoTime();
   private URI endpoint;
   private List<LoginPackets.ServerLine> servers = Collections.emptyList();
@@ -162,6 +163,10 @@ public final class GameSession implements AutoCloseable {
             return;
           }
           socket = next;
+          // The original keeps these as TCPBase.usID and Business.ServerLineIndex for the whole
+          // session; the create-character request writes both back.
+          handoff = target;
+          serverLine = line.index();
           change(Stage.CONNECTING_GAME, "Đang kết nối máy chủ game...");
         }
         next.connect(new InetSocketAddress(target.host(), target.port()), 4000);
@@ -184,6 +189,34 @@ public final class GameSession implements AutoCloseable {
           Arrays.fill(secret, '\0');
           if (pendingPassword == secret) pendingPassword = null;
         }
+      }
+    });
+  }
+
+  /**
+   * Sends the creation request Business.NewRoleWnd_EditOK sends. The server answers with a fresh
+   * role list, so nothing is added locally: the list this session shows always comes from 1080.
+   */
+  public synchronized void createRole(String name, int sex, int profession, int slot) {
+    ensureOpen();
+    if (stage != Stage.ROLES_READY || handoff == null)
+      throw new IllegalStateException("Create a character from the character list");
+    final byte[] request =
+        LoginPackets.createRole(name, sex, profession, slot, handoff, serverLine);
+    final long current = generation;
+    change(Stage.ROLES_READY, "Đang tạo nhân vật...");
+    io.execute(() -> {
+      try {
+        Socket active;
+        synchronized (this) {
+          if (current != generation) return;
+          active = socket;
+        }
+        if (active == null) throw new EOFException();
+        active.getOutputStream().write(Wire.tcpRequest(request, key++));
+        active.getOutputStream().flush();
+      } catch (IOException | RuntimeException ex) {
+        fail(current, "Chưa tạo được nhân vật: lỗi kết nối.");
       }
     });
   }
@@ -265,7 +298,10 @@ public final class GameSession implements AutoCloseable {
         if (packet == null) throw new EOFException();
         synchronized (this) {
           if (current != generation) return;
-          if (packet.opcode() == 1080 && stage == Stage.CONNECTING_GAME) {
+          if (packet.opcode() == 1080
+              && (stage == Stage.CONNECTING_GAME || stage == Stage.ROLES_READY)) {
+            // Creating a character answers with the whole list again, as processLoginRoleCmd reads
+            // it.
             roles = LoginPackets.roles(packet);
             change(Stage.ROLES_READY, "Chọn nhân vật để vào game.");
           } else if (packet.opcode() == 1110 && inWorld()) {
