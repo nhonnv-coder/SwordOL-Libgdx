@@ -24,6 +24,7 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
   private Label status, phase, map;
   private GameSession.Snapshot snapshot;
   private NativeWorldScreen worldScreen;
+  private NewRoleForm newRole;
   private Table root;
   private int frames;
 
@@ -58,6 +59,11 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
     root.add(login).colspan(2).left().padBottom(20).row();
     roles = new SelectBox<>(skin);
     row(root, "Nhân vật", roles);
+    newRole = new NewRoleForm(skin);
+    newRole.setListener((name, sex, profession, slot) -> {
+      if (actions != null) actions.createRole(name, sex, profession, slot);
+    });
+    root.add(newRole).colspan(2).growX().padBottom(14).row();
     Table buttons = new Table();
     enter = new TextButton("Vào game", skin);
     TextButton disconnect = new TextButton("Ngắt kết nối", skin);
@@ -141,6 +147,7 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
       com.badlogic.gdx.utils.Array<LoginPackets.Role> list = new com.badlogic.gdx.utils.Array<>();
       for (LoginPackets.Role role : next.roles()) list.add(role);
       roles.setItems(list);
+      newRole.refreshSlots(next.roles());
     }
     snapshot = next;
     phase.setText(stageLabel(next.stage()));
@@ -157,6 +164,7 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
     login.setDisabled(!idle || next.servers().isEmpty());
     enter.setDisabled(next.stage() != GameSession.Stage.ROLES_READY || next.roles().isEmpty());
     roles.setDisabled(next.stage() != GameSession.Stage.ROLES_READY);
+    newRole.setEnabled(next.stage() == GameSession.Stage.ROLES_READY);
     map.setText(
         next.mapId() == 0
             ? ""

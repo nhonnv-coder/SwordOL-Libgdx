@@ -380,6 +380,10 @@ public final class GameSession implements AutoCloseable {
     if (world == null) return;
     byte[] data = resources.completed(MapResourceAssembly.Kind.MAP_DATA);
     byte[] refs = resources.completed(MapResourceAssembly.Kind.MAP_REF);
+    // A role the server only announces a map for sends no 1407 at all. That is an announcement,
+    // not a broken transfer: show the identity and build no world. Only a half-arrived set is
+    // wrong.
+    if (data == null && refs == null && !resources.hasPending()) return;
     if (data == null || refs == null) {
       resources.reset();
       throw new IOException("Map identity arrived without its resources");

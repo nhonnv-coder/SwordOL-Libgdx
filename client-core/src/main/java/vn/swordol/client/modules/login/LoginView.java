@@ -8,6 +8,14 @@ public interface LoginView {
 
     void login(LoginPackets.ServerLine server, String account, char[] password);
 
+    /**
+     * Creates a character the way the original creation screen does.
+     *
+     * @param sex {@link vn.swordol.protocol.wire.RoleLooks#MALE} or {@code FEMALE}
+     * @param profession 1 to {@link vn.swordol.protocol.wire.RoleLooks#PROFESSIONS}
+     */
+    void createRole(String name, int sex, int profession, int slot);
+
     void enter(int roleId);
 
     void disconnect();

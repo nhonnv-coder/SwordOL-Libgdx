@@ -247,6 +247,55 @@ public class GameSessionTest {
     }
   }
 
+  @Test
+  public void aMapAnnouncementWithoutResourcesDoesNotKillAWorldSession() throws Exception {
+    // A role the server only announces a map for sends no 1407 at all. With a world attached the
+    // session used to treat that as a broken transfer and drop the connection.
+    GatewayServer.Account account =
+        new GatewayServer.Account(
+            7,
+            "fixture",
+            Arrays.asList(new GatewayServer.Role(42, "Local role", 0, 1101400, "Trung nguyen")));
+    try (GatewayServer server = new GatewayServer((name, password) -> account)) {
+      server.start();
+      BlockingQueue<GameSession.Snapshot> states = new LinkedBlockingQueue<>();
+      BlockingQueue<Runnable> callbacks = new LinkedBlockingQueue<>();
+      try (GameSession session =
+          new GameSession(callbacks::add, states::add, new RecordingWorld())) {
+        session.loadServers(server.accountEndpoint());
+        GameSession.Snapshot list = await(GameSession.Stage.SERVERS_READY, states, callbacks);
+        session.login(list.servers().get(0), "fixture", "fixture-only".toCharArray());
+        GameSession.Snapshot roles = await(GameSession.Stage.ROLES_READY, states, callbacks);
+        session.enter(roles.roles().get(0).id());
+        GameSession.Snapshot shown = await(GameSession.Stage.MAP_RECEIVED, states, callbacks);
+        assertEquals(1101400, shown.mapId());
+      }
+    }
+  }
+
+  /** A world that records nothing: this test only cares that the session survives. */
+  private static final class RecordingWorld
+      implements vn.swordol.client.modules.world.WorldListener {
+    @Override
+    public void mapLoaded(
+        vn.swordol.protocol.wire.WorldPackets.MapIdentity identity,
+        vn.swordol.protocol.wire.MapResource resource,
+        vn.swordol.protocol.wire.MapReferences references,
+        java.util.Map<Integer, byte[]> images) {}
+
+    @Override
+    public void mapUpdate(vn.swordol.protocol.wire.WorldPackets.MapUpdate update) {}
+
+    @Override
+    public void user(vn.swordol.protocol.wire.WorldPackets.UserInfo info) {}
+
+    @Override
+    public void otherPlayer(vn.swordol.protocol.wire.WorldPackets.PlayerInfo info) {}
+
+    @Override
+    public void walk(vn.swordol.protocol.wire.WorldPackets.Walk walk) {}
+  }
+
   private static GameSession.Snapshot awaitRoleCount(
       int wanted, BlockingQueue<GameSession.Snapshot> states, BlockingQueue<Runnable> callbacks)
       throws Exception {
