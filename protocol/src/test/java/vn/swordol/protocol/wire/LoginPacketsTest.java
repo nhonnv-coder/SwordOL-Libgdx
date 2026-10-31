@@ -78,6 +78,76 @@ public class LoginPacketsTest {
     assertArrayEquals(new byte[] {66, 49}, handoff.header());
   }
 
+  @Test
+  public void writesTheCreateRoleRequestFieldForFieldLikeTheOriginal() throws Exception {
+    LoginPackets.Handoff handoff = handoff();
+    Packet packet =
+        Wire.logical(LoginPackets.createRole("Kiem Khach", RoleLooks.FEMALE, 2, 1, handoff, 3));
+    assertEquals(1001, packet.opcode());
+    assertEquals(12, packet.fields().size());
+    // Business.NewRoleWnd_EditOK, in its own order.
+    assertEquals("Kiem Khach", LoginPackets.text(packet, 0));
+    assertEquals(RoleLooks.FEMALE, LoginPackets.number(packet, 1));
+    assertEquals(2 * 10 + 1, LoginPackets.number(packet, 2));
+    assertEquals(0, LoginPackets.number(packet, 3));
+    // TCPBase.usID, which processLoginBackCmd sets to the account id of the 1052 response.
+    assertEquals(handoff.account(), LoginPackets.number(packet, 4));
+    assertEquals(0, LoginPackets.number(packet, 5));
+    assertEquals("", LoginPackets.text(packet, 6));
+    assertEquals(1, LoginPackets.number(packet, 7));
+    assertEquals(0, LoginPackets.number(packet, 8));
+    assertEquals(3, LoginPackets.number(packet, 9));
+    assertEquals(0, LoginPackets.number(packet, 10));
+    assertEquals(0, LoginPackets.number(packet, 11));
+  }
+
+  @Test
+  public void refusesCreateRoleArgumentsTheCreationScreenCannotProduce() {
+    LoginPackets.Handoff handoff = handoff();
+    // Profession 9 is {0, 0} in the look table; the original never sends it.
+    assertCreateRoleRejected("A", RoleLooks.MALE, 9, 0, handoff, 0);
+    // Profession 2 offers no male look.
+    assertCreateRoleRejected("A", RoleLooks.MALE, 2, 0, handoff, 0);
+    assertCreateRoleRejected("A", 2, 1, 0, handoff, 0);
+    // The creation screen holds three slots and limits the name to ten characters.
+    assertCreateRoleRejected("A", RoleLooks.MALE, 1, 3, handoff, 0);
+    assertCreateRoleRejected("", RoleLooks.MALE, 1, 0, handoff, 0);
+    assertCreateRoleRejected("   ", RoleLooks.MALE, 1, 0, handoff, 0);
+    assertCreateRoleRejected("12345678901", RoleLooks.MALE, 1, 0, handoff, 0);
+  }
+
+  private static void assertCreateRoleRejected(
+      String name, int sex, int profession, int slot, LoginPackets.Handoff handoff, int line) {
+    try {
+      LoginPackets.createRole(name, sex, profession, slot, handoff, line);
+      fail("accepted a request the creation screen cannot produce");
+    } catch (IllegalArgumentException expected) {
+    }
+  }
+
+  private static LoginPackets.Handoff handoff() {
+    try {
+      return LoginPackets.handoff(
+          Wire.logical(
+              new WireWriter(1052)
+                  .integer(77)
+                  .integer(88)
+                  .integer(1)
+                  .text("127.0.0.1")
+                  .integer(0)
+                  .integer(0)
+                  .integer(0)
+                  .integer(7781)
+                  .integer(0)
+                  .integer(0)
+                  .integer(0)
+                  .integer(0)
+                  .build()));
+    } catch (IOException ex) {
+      throw new IllegalStateException(ex);
+    }
+  }
+
   private static void appendRole(WireWriter out, int id, String name, int slot) {
     out.integer(id)
         .integer(1)

@@ -45,6 +45,46 @@ public final class LoginPackets {
         .build();
   }
 
+  /** The creation screen's edit box limits the name with setCharLimit(10). */
+  public static final int ROLE_NAME_LIMIT = 10;
+
+  /** The three slots SELROLE_WND holds; the request writes focusedID - 11001. */
+  public static final int ROLE_SLOTS = 3;
+
+  /**
+   * Business.NewRoleWnd_EditOK, field for field. The user id is TCPBase.usID, which
+   * processLoginBackCmd assigns from the account id of the 1052 response, so it comes off the
+   * handoff rather than being tracked separately. The discretion byte is the one connect() also
+   * sends as zero.
+   *
+   * @param sex {@link RoleLooks#MALE} or {@link RoleLooks#FEMALE}
+   * @param profession 1 to {@link RoleLooks#PROFESSIONS}, as the screen numbers its buttons
+   */
+  public static byte[] createRole(
+      String name, int sex, int profession, int slot, Handoff handoff, int line) {
+    String trimmed = name == null ? "" : name.trim();
+    if (trimmed.isEmpty() || trimmed.length() > ROLE_NAME_LIMIT)
+      throw new IllegalArgumentException("Role name must hold 1 to 10 characters");
+    if (!RoleLooks.offers(profession, sex))
+      throw new IllegalArgumentException("No look face for this profession and sex");
+    if (slot < 0 || slot >= ROLE_SLOTS)
+      throw new IllegalArgumentException("Role slot out of range");
+    return new WireWriter(1001)
+        .text(name)
+        .integer(sex)
+        .signedByte(profession * 10 + 1)
+        .signedByte(0)
+        .integer(handoff.account)
+        .integer(0)
+        .text("")
+        .signedByte(slot)
+        .integer(0)
+        .signedByte(line)
+        .signedByte(0)
+        .signedByte(handoff.tryGame)
+        .build();
+  }
+
   public static byte[] enter(int role) {
     return new WireWriter(1081)
         .integer(role)
