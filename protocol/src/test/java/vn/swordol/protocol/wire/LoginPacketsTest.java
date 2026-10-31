@@ -79,6 +79,40 @@ public class LoginPacketsTest {
   }
 
   @Test
+  public void writesTheRegistrationRequestTheAccountScreenSends() throws Exception {
+    Packet packet = Wire.logical(LoginPackets.register("account01", "password01", "answer0001"));
+    assertEquals(1055, packet.opcode());
+    assertEquals(8, packet.fields().size());
+    // Business.initRegisterPacket, in its own order.
+    assertEquals(0, LoginPackets.number(packet, 0));
+    assertEquals("account01", LoginPackets.text(packet, 1));
+    assertEquals("password01", LoginPackets.text(packet, 2));
+    assertEquals("answer0001", LoginPackets.text(packet, 3));
+    assertEquals("", LoginPackets.text(packet, 4));
+    // getFenBaoID reads PackageID.o and getBaoUserID its own file; this build ships neither.
+    assertEquals(0, LoginPackets.number(packet, 5));
+    assertEquals(0, LoginPackets.number(packet, 6));
+    assertEquals(9, LoginPackets.number(packet, 7));
+  }
+
+  @Test
+  public void refusesRegistrationFieldsShorterThanTheScreenAccepts() {
+    // CustomScreen rejects any of the three boxes under six characters with other_str[583].
+    assertRegisterRejected("short", "password01", "answer0001");
+    assertRegisterRejected("account01", "pw", "answer0001");
+    assertRegisterRejected("account01", "password01", "a");
+    assertRegisterRejected(null, "password01", "answer0001");
+  }
+
+  private static void assertRegisterRejected(String account, String password, String third) {
+    try {
+      LoginPackets.register(account, password, third);
+      fail("accepted a registration the screen refuses");
+    } catch (IllegalArgumentException expected) {
+    }
+  }
+
+  @Test
   public void writesTheCreateRoleRequestFieldForFieldLikeTheOriginal() throws Exception {
     LoginPackets.Handoff handoff = handoff();
     Packet packet =

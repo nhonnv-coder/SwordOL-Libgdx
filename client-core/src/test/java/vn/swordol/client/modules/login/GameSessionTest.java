@@ -189,6 +189,78 @@ public class GameSessionTest {
   }
 
   @Test
+  public void registersAnAccountAndThenSignsInWithIt() throws Exception {
+    java.util.Map<String, char[]> store = new java.util.concurrent.ConcurrentHashMap<>();
+    GatewayServer.Account created =
+        new GatewayServer.Account(
+            9,
+            "newcomer01",
+            Arrays.asList(new GatewayServer.Role(50, "Local role", 0, 1101400, "Trung nguyen")));
+    try (GatewayServer server =
+        new GatewayServer((name, password) -> {
+          char[] kept = store.get(name);
+          return kept != null && Arrays.equals(kept, password) ? created : null;
+        })) {
+      server.setRegistrar((name, password, third) -> {
+        if (store.containsKey(name)) return null;
+        store.put(name, password.clone());
+        return created;
+      });
+      server.start();
+      BlockingQueue<GameSession.Snapshot> states = new LinkedBlockingQueue<>();
+      BlockingQueue<Runnable> callbacks = new LinkedBlockingQueue<>();
+      try (GameSession session = new GameSession(callbacks::add, states::add)) {
+        session.loadServers(server.accountEndpoint());
+        GameSession.Snapshot list = await(GameSession.Stage.SERVERS_READY, states, callbacks);
+
+        session.register("newcomer01", "secret0001".toCharArray(), "answer0001");
+        awaitStatus("thành công", states, callbacks);
+
+        // The account exists now, so the login that follows is the ordinary one.
+        session.login(list.servers().get(0), "newcomer01", "secret0001".toCharArray());
+        assertEquals(1, await(GameSession.Stage.ROLES_READY, states, callbacks).roles().size());
+      }
+    }
+  }
+
+  @Test
+  public void reportsARefusedRegistrationWithoutDroppingTheSession() throws Exception {
+    GatewayServer.Account account =
+        new GatewayServer.Account(
+            7,
+            "fixture",
+            Arrays.asList(new GatewayServer.Role(42, "Local role", 0, 1101400, "Trung nguyen")));
+    try (GatewayServer server = new GatewayServer((name, password) -> account)) {
+      // No registrar: a gateway that cannot store accounts refuses rather than pretending.
+      server.start();
+      BlockingQueue<GameSession.Snapshot> states = new LinkedBlockingQueue<>();
+      BlockingQueue<Runnable> callbacks = new LinkedBlockingQueue<>();
+      try (GameSession session = new GameSession(callbacks::add, states::add)) {
+        session.loadServers(server.accountEndpoint());
+        await(GameSession.Stage.SERVERS_READY, states, callbacks);
+        session.register("newcomer01", "secret0001".toCharArray(), "answer0001");
+        GameSession.Snapshot refused = awaitStatus("từ chối", states, callbacks);
+        assertEquals(GameSession.Stage.SERVERS_READY, refused.stage());
+      }
+    }
+  }
+
+  private static GameSession.Snapshot awaitStatus(
+      String fragment,
+      BlockingQueue<GameSession.Snapshot> states,
+      BlockingQueue<Runnable> callbacks)
+      throws Exception {
+    long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+    while (System.nanoTime() < until) {
+      Runnable run = callbacks.poll(50, TimeUnit.MILLISECONDS);
+      if (run != null) run.run();
+      GameSession.Snapshot s;
+      while ((s = states.poll()) != null) if (s.status().contains(fragment)) return s;
+    }
+    throw new AssertionError("Session status never mentioned: " + fragment);
+  }
+
+  @Test
   public void createsACharacterOnTheGatewayAndSeesItInTheRoleList() throws Exception {
     GatewayServer.Account account =
         new GatewayServer.Account(

@@ -45,6 +45,33 @@ public final class LoginPackets {
         .build();
   }
 
+  /** CustomScreen refuses any registration box under six characters with other_str[583]. */
+  public static final int REGISTER_FIELD_MINIMUM = 6;
+
+  /**
+   * Business.initRegisterPacket over the account channel, the branch openRegisterWnd(0) takes. The
+   * third box is sent as the screen collects it; only the first two are ever read back, as the
+   * account and password of the login screen, so this does not name it.
+   *
+   * <p>The two identity ints are zero here: the original reads them from PackageID.o and its own
+   * user file, neither of which this build ships.
+   */
+  public static byte[] register(String account, String password, String third) {
+    for (String field : new String[] {account, password, third})
+      if (field == null || field.length() < REGISTER_FIELD_MINIMUM)
+        throw new IllegalArgumentException("Every registration field needs six characters");
+    return new WireWriter(1055)
+        .signedByte(0)
+        .text(account)
+        .text(password)
+        .text(third)
+        .text("")
+        .integer(0)
+        .integer(0)
+        .integer(9)
+        .build();
+  }
+
   /** The creation screen's edit box limits the name with setCharLimit(10). */
   public static final int ROLE_NAME_LIMIT = 10;
 

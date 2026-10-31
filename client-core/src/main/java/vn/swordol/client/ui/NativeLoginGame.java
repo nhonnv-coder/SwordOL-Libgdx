@@ -25,6 +25,7 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
   private GameSession.Snapshot snapshot;
   private NativeWorldScreen worldScreen;
   private NewRoleForm newRole;
+  private RegisterForm registerForm;
   private Table root;
   private int frames;
 
@@ -59,6 +60,11 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
     root.add(login).colspan(2).left().padBottom(20).row();
     roles = new SelectBox<>(skin);
     row(root, "Nhân vật", roles);
+    registerForm = new RegisterForm(skin);
+    registerForm.setListener((account, password, third) -> {
+      if (actions != null) actions.register(account, password, third);
+    });
+    root.add(registerForm).colspan(2).growX().padBottom(14).row();
     newRole = new NewRoleForm(skin);
     newRole.setListener((name, sex, profession, slot) -> {
       if (actions != null) actions.createRole(name, sex, profession, slot);
@@ -165,6 +171,7 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
     enter.setDisabled(next.stage() != GameSession.Stage.ROLES_READY || next.roles().isEmpty());
     roles.setDisabled(next.stage() != GameSession.Stage.ROLES_READY);
     newRole.setEnabled(next.stage() == GameSession.Stage.ROLES_READY);
+    registerForm.setEnabled(next.stage() == GameSession.Stage.SERVERS_READY);
     map.setText(
         next.mapId() == 0
             ? ""
@@ -188,6 +195,8 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
         return "Danh sách máy chủ";
       case SERVERS_READY:
         return "Chọn máy chủ";
+      case REGISTERING:
+        return "Đăng ký tài khoản";
       case AUTHENTICATING:
         return "Đăng nhập tài khoản";
       case CONNECTING_GAME:

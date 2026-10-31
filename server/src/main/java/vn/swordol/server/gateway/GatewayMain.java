@@ -40,13 +40,27 @@ public final class GatewayMain {
             : new GatewayServer.Role(42, "Kiếm Khách", 0, world);
     GatewayServer.Account account =
         new GatewayServer.Account(7, name, Collections.singletonList(role));
+    java.util.Map<String, byte[]> registered = new java.util.concurrent.ConcurrentHashMap<>();
+    java.util.Map<String, GatewayServer.Account> accounts =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    java.util.concurrent.atomic.AtomicInteger nextAccountId =
+        new java.util.concurrent.atomic.AtomicInteger(100);
     GatewayServer server =
         new GatewayServer(
             (user, secret) -> {
-              if (!name.equals(user)) return null;
+              if (name.equals(user)) {
+                byte[] candidate = hash(secret, salt);
+                try {
+                  return MessageDigest.isEqual(expected, candidate) ? account : null;
+                } finally {
+                  Arrays.fill(candidate, (byte) 0);
+                }
+              }
+              byte[] stored = registered.get(user);
+              if (stored == null) return null;
               byte[] candidate = hash(secret, salt);
               try {
-                return MessageDigest.isEqual(expected, candidate) ? account : null;
+                return MessageDigest.isEqual(stored, candidate) ? accounts.get(user) : null;
               } finally {
                 Arrays.fill(candidate, (byte) 0);
               }
@@ -66,6 +80,28 @@ public final class GatewayMain {
                   done.countDown();
                 },
                 "legacy-local-shutdown"));
+    // Accounts made here live in this process only, hashed with the session salt like the one the
+    // environment configured. A fresh account owns no character, so it carries the served world
+    // and the player creates one.
+    server.setRegistrar((user, secret, third) -> {
+      if (name.equals(user) || registered.containsKey(user) || registered.size() >= 32) return null;
+      byte[] stored = hash(secret, salt);
+      GatewayServer.Account fresh =
+          world == null
+              ? null
+              : new GatewayServer.Account(
+                  nextAccountId.incrementAndGet(),
+                  user,
+                  java.util.Collections.<GatewayServer.Role>emptyList(),
+                  world);
+      if (fresh == null) {
+        Arrays.fill(stored, (byte) 0);
+        return null;
+      }
+      registered.put(user, stored);
+      accounts.put(user, fresh);
+      return fresh;
+    });
     server.start();
     System.out.println("Local binary login server: " + server.accountEndpoint());
     System.out.println(

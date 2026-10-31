@@ -14,6 +14,7 @@ public final class GameSession implements AutoCloseable {
     DISCONNECTED,
     LOADING_SERVERS,
     SERVERS_READY,
+    REGISTERING,
     AUTHENTICATING,
     CONNECTING_GAME,
     ROLES_READY,
@@ -122,6 +123,50 @@ public final class GameSession implements AutoCloseable {
         }
       } catch (IOException | RuntimeException ex) {
         fail(current, "Không tải được danh sách máy chủ: lỗi kết nối hoặc dữ liệu chưa hỗ trợ.");
+      }
+    });
+  }
+
+  /**
+   * Registers an account on the account endpoint, the branch openRegisterWnd(0) takes. The server
+   * answers on the same channel; a reply whose first parameter is empty is a refusal, which the
+   * original reports without naming a reason. Nothing is signed in here: the login screen is still
+   * where the new account is used.
+   *
+   * <p>Takes ownership of password contents and wipes the caller's array.
+   */
+  public synchronized void register(String account, char[] password, String third) {
+    ensureOpen();
+    Objects.requireNonNull(password);
+    if (endpoint == null) throw new IllegalStateException("Load the server list first");
+    if (stage != Stage.SERVERS_READY)
+      throw new IllegalStateException("Register from the account screen");
+    final byte[] request;
+    try {
+      request = LoginPackets.register(account, new String(password), third);
+    } finally {
+      Arrays.fill(password, '\0');
+    }
+    final long current = generation;
+    change(Stage.REGISTERING, "Đang đăng ký tài khoản...");
+    io.execute(() -> {
+      try {
+        Wire.Batch batch = exchange(request, current);
+        String created = null;
+        for (Packet packet : batch.packets())
+          if (packet.opcode() == 1055 && LoginPackets.number(packet, 0) == 0)
+            created = LoginPackets.text(packet, 1);
+        synchronized (this) {
+          if (current != generation) return;
+          if (created == null || created.isEmpty()) {
+            change(Stage.SERVERS_READY, "Đăng ký bị từ chối. Thử tên khác.");
+            return;
+          }
+          change(
+              Stage.SERVERS_READY, "Đăng ký tài khoản thành công! Đăng nhập bằng tài khoản mới.");
+        }
+      } catch (IOException | RuntimeException ex) {
+        fail(current, "Chưa đăng ký được: lỗi kết nối hoặc dữ liệu chưa hỗ trợ.");
       }
     });
   }

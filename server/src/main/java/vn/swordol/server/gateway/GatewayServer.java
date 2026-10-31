@@ -20,7 +20,13 @@ public final class GatewayServer implements AutoCloseable {
     Account verify(String name, char[] password);
   }
 
+  /** Creates a local account, or returns null when the name is taken or the server refuses it. */
+  public interface Registrar {
+    Account register(String name, char[] password, String third);
+  }
+
   private final Authenticator authenticator;
+  private volatile Registrar registrar;
   private final HttpServer http;
   private final ServerSocket tcp;
   private final ThreadPoolExecutor accountWorkers =
@@ -70,6 +76,11 @@ public final class GatewayServer implements AutoCloseable {
     }
     http.createContext("/account", this::account);
     http.setExecutor(accountWorkers);
+  }
+
+  /** Without one, 1055 is refused: a gateway that cannot store accounts must not pretend to. */
+  public void setRegistrar(Registrar registrar) {
+    this.registrar = registrar;
   }
 
   public URI accountEndpoint() {
@@ -126,6 +137,8 @@ public final class GatewayServer implements AutoCloseable {
                 .signedByte(1)
                 .integer(1)
                 .build();
+      } else if (packet.opcode() == 1055) {
+        response = registerAccount(packet);
       } else if (packet.opcode() == 1051) {
         if (packet.fields().size() != 9
             || LoginPackets.number(packet, 4) != 1
@@ -242,6 +255,37 @@ public final class GatewayServer implements AutoCloseable {
     } finally {
       sockets.remove(socket);
     }
+  }
+
+  /**
+   * Business.initRegisterPacket over the account channel. The reply is the shape CmdProcessor reads
+   * at case 0: a status byte then three parameters, where a non-empty first parameter is what makes
+   * the client report success.
+   */
+  private byte[] registerAccount(Packet packet) throws IOException {
+    if (packet.fields().size() != 8) throw new IOException("Invalid registration schema");
+    String name = LoginPackets.text(packet, 1);
+    String third = LoginPackets.text(packet, 3);
+    char[] password = LoginPackets.text(packet, 2).toCharArray();
+    Account created;
+    try {
+      Registrar store = registrar;
+      created =
+          store == null
+                  || name.length() < LoginPackets.REGISTER_FIELD_MINIMUM
+                  || password.length < LoginPackets.REGISTER_FIELD_MINIMUM
+                  || third.length() < LoginPackets.REGISTER_FIELD_MINIMUM
+              ? null
+              : store.register(name, password, third);
+    } finally {
+      Arrays.fill(password, '\0');
+    }
+    return new WireWriter(1055)
+        .signedByte(0)
+        .text(created == null ? "" : created.name)
+        .text("")
+        .text("")
+        .build();
   }
 
   /** The character list processLoginRoleCmd reads: a count byte then 30 fields per role. */
@@ -422,9 +466,18 @@ public final class GatewayServer implements AutoCloseable {
     private final int id;
     private final String name;
     private final List<Role> roles;
+    private final World startingWorld;
     private int nextRoleId;
 
     public Account(int id, String name, List<Role> roles) {
+      this(id, name, roles, null);
+    }
+
+    /**
+     * An account whose characters are yet to be created needs somewhere to put them, so a fresh one
+     * carries the world the launcher serves.
+     */
+    public Account(int id, String name, List<Role> roles, World startingWorld) {
       if (id <= 0 || name == null || roles.size() > SLOTS)
         throw new IllegalArgumentException("Invalid local account");
       Set<Integer> slots = new HashSet<>(), ids = new HashSet<>();
@@ -437,6 +490,7 @@ public final class GatewayServer implements AutoCloseable {
       this.id = id;
       this.name = name;
       this.roles = new ArrayList<>(roles);
+      this.startingWorld = startingWorld;
       this.nextRoleId = highest + 1;
     }
 
@@ -458,8 +512,8 @@ public final class GatewayServer implements AutoCloseable {
      * other role here holds. The new role enters the same world as an existing one, because the
      * local gateway has no starting map of its own.
      *
-     * <p>shortcut: the world is copied from the first role that has one, when to upgrade: a local
-     * server that owns a starting map per profession.
+     * <p>shortcut: every character starts in the same world, when to upgrade: a local server that
+     * owns a starting map per profession.
      */
     synchronized Role create(String name, int slot, int lookFace) {
       if (roles.size() >= SLOTS) throw new IllegalArgumentException("No free character slot");
@@ -467,12 +521,16 @@ public final class GatewayServer implements AutoCloseable {
         if (role.slot == slot) throw new IllegalArgumentException("Slot already holds a character");
         if (role.name.equals(name)) throw new IllegalArgumentException("Name already taken");
       }
-      Role template = roles.isEmpty() ? null : roles.get(0);
-      if (template == null) throw new IllegalArgumentException("No world to place a character in");
-      Role created =
-          template.world == null
-              ? new Role(nextRoleId, name, slot, template.mapId, template.mapName, lookFace)
-              : new Role(nextRoleId, name, slot, template.world, lookFace);
+      World where = roles.isEmpty() ? startingWorld : roles.get(0).world;
+      Role created;
+      if (where != null) {
+        created = new Role(nextRoleId, name, slot, where, lookFace);
+      } else if (roles.isEmpty()) {
+        throw new IllegalArgumentException("No world to place a character in");
+      } else {
+        Role template = roles.get(0);
+        created = new Role(nextRoleId, name, slot, template.mapId, template.mapName, lookFace);
+      }
       nextRoleId++;
       roles.add(created);
       return created;
