@@ -9,7 +9,18 @@
 3. Chọn máy chủ/tuyến, nhập tài khoản local vừa đặt, bấm **Đăng nhập**. Ô mật khẩu được xóa sau thao tác và không lưu xuống hồ sơ.
 4. Chọn nhân vật, bấm **Vào game**. Client nhận tài nguyên bản đồ, dựng lưới và cho đi lại từng ô; xem [native-world.md](native-world.md). Combat, vật phẩm, NPC và animation nhân vật vẫn chưa có.
 
-Nếu dùng dịch vụ account khác do người dùng chọn, nhập URL trực tiếp. Native hiện hỗ trợ HTTP(S) account → TCP gameplay theo connection mode1; chưa hỗ trợ WAP/proxy hoặc HTTP gameplay. Redirect HTTP không được tự theo. Không có tự dò endpoint, tự đăng nhập, tạo/xóa nhân vật hay thao tác vật phẩm.
+Nếu dùng dịch vụ account khác do người dùng chọn, nhập URL trực tiếp. Native hiện hỗ trợ HTTP(S) account → TCP gameplay theo connection mode1; chưa hỗ trợ WAP/proxy hoặc HTTP gameplay. Redirect HTTP không được tự theo. Không có tự dò endpoint, tự đăng nhập, xóa nhân vật hay thao tác vật phẩm.
+
+## Đăng ký và tạo nhân vật
+
+Hai bước này đã có, theo đúng packet của client gốc (xem `docs/analysis/protocol.md`):
+
+- **Đăng ký** dùng opcode `1055` trên kênh HTTP account, thân gói theo `Business.initRegisterPacket`. Mỗi ô cần tối thiểu6 ký tự, đúng luật `CustomScreen` kiểm trước khi gửi. Đăng ký xong **không** tự đăng nhập; màn hình báo kết quả và bạn đăng nhập bằng tài khoản mới. Server local chỉ nhận `1055` khi có `Registrar`; `GatewayMain` cấp một bộ nhớ tạm trong tiến trình, băm bằng salt của phiên, tối đa32 tài khoản và mất khi tắt server.
+- **Tạo nhân vật** dùng opcode `1001` trên kênh TCP game, thân gói theo `Business.NewRoleWnd_EditOK`. Tên tối đa10 ký tự,3 ô nhân vật. Môn phái và giới tính lấy từ bảng `newRoleLookFaceDatID`: môn phái9 và10 không tạo được, và môn phái nào thiếu một giới thì giới đó không hiện. Client **không** tự thêm nhân vật vào danh sách; nó vẽ lại theo gói `1080` server trả về. Look face do server quyết theo bảng, không lấy từ request.
+
+Tên môn phái hiển thị là số thứ tự. Client gốc không hard-code tên: `NewRoleWnd_Flush` hỏi server bằng gói `1602` rồi hiện chữ nhận được; phần đó chưa làm.
+
+Nhân vật tạo trên server local vào cùng bản đồ mà launcher đang phục vụ, vì gateway không có bản đồ khởi đầu riêng theo môn phái.
 
 JSON demo cũ chỉ mở khi chạy Java với `-Dswordol.demo=true`; launcher desktop mặc định không dùng nó nữa. Android/iOS chưa chuyển sang màn hình mới.
 
@@ -24,7 +35,7 @@ JSON demo cũ chỉ mở khi chạy Java với `-Dswordol.demo=true`; launcher d
 
 Không thêm Maven module. IO chạy ngoài render thread, terminal failure/disconnect làm mất hiệu lực generation; HTTP cancel ở worker riêng. Watchdog áp dụng cho bước handshake, không coi người dùng chờ chọn nhân vật là handshake lỗi. Server tách executor account và game để phiên game không chiếm hết dịch vụ đăng nhập.
 
-Server local không có DB, account registration hoặc world/inventory persistence. Verifier của launcher dùng PBKDF2 cho mật khẩu local của phiên; account/role mẫu chỉ tồn tại trong process. Đây là vertical slice thực thi giao thức, không phải server cũ hoàn chỉnh hay server production.
+Server local không có DB hay world/inventory persistence; tài khoản đăng ký và nhân vật tạo ra chỉ sống trong tiến trình. Verifier của launcher dùng PBKDF2 cho mật khẩu local của phiên; account/role mẫu chỉ tồn tại trong process. Đây là vertical slice thực thi giao thức, không phải server cũ hoàn chỉnh hay server production.
 
 ## Nguồn đối chiếu và kiểm chứng
 
