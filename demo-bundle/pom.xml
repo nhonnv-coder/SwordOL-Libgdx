@@ -1,0 +1,7 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>vn.swordol</groupId><artifactId>swordol-parent</artifactId><version>0.1.0-SNAPSHOT</version></parent>
+  <artifactId>demo-bundle</artifactId>
+  <name>Sample asset bundle shared by the client and the demo server</name>
+  <description>Holds the built bundle of assets/source/demo so the client and the server load the exact same bytes. Regenerate with scripts/build-assets.ps1 -UpdateClient; never edit the bundle by hand.</description>
+</project>

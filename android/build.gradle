@@ -1,0 +1,42 @@
+plugins { id 'com.android.application' version '8.13.0' }
+
+android {
+    namespace 'vn.swordol.android'
+    compileSdk 35
+    defaultConfig { applicationId 'vn.swordol.demo'; minSdk 26; targetSdk 35; versionCode 1; versionName '0.1.0' }
+    sourceSets.main {
+        java.srcDirs += ['../client-core/src/main/java', '../asset-runtime/src/main/java']
+        resources.srcDirs += ['../client-core/src/main/resources', '../demo-bundle/src/main/resources']
+        jniLibs.srcDirs = ['build/generated/natives']
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    packaging { resources.excludes += ['META-INF/INDEX.LIST', 'META-INF/DEPENDENCIES'] }
+}
+configurations { natives }
+dependencies {
+    implementation 'com.badlogicgames.gdx:gdx:1.14.2'
+    implementation 'com.badlogicgames.gdx:gdx-backend-android:1.14.2'
+    implementation 'org.puremvc:puremvc:2.2'
+    implementation 'com.google.code.gson:gson:2.13.2'
+    natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-arm64-v8a'
+    natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-armeabi-v7a'
+    natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-x86_64'
+}
+tasks.register('extractNatives') {
+    inputs.files configurations.natives
+    outputs.dir layout.buildDirectory.dir('generated/natives')
+    doLast {
+        configurations.natives.files.each { jar ->
+            def abi = ['arm64-v8a','armeabi-v7a','x86_64'].find { jar.name.contains("natives-${it}") }
+            copy { from zipTree(jar); include '*.so'; into layout.buildDirectory.dir("generated/natives/${abi}") }
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'extractNatives' }

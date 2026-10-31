@@ -1,0 +1,8 @@
+.tools
+.agents
+.codex
+.git
+assets/original
+docs/files
+**/target/*
+!server/target/swordol-server.jar

@@ -1,0 +1,18 @@
+# Native world vertical slice — map resources, user entity, movement
+
+Continuation of the native login slice. That slice stops at the1110 map announcement and explicitly does not render a world. This slice makes the native client consume the real map resources the original server sends, draw the actual map, place the player character where the server puts it, and move with the original walk packet, collision and server correction.
+
+Sources (original JAR SHA16024c3ed0536b29217a67f657f110abc78549eae75ef6ac0bfdd0dc205b0ccd): CmdProcessor.processMapDataCmd/processMapInfoCmd/processMapPortalCmd/processUserInfoCmd/processOtherPlayerCmd/processWalkCmd, Engine.packetUserWalk, MapEx tile indexing and draw order, Entity.compareMapPos, ImagePointer.drawTileObj/initCurMapRefDataEx, MapTile.s_sBinDataIndex. Real captured inbound bytes under captures/ give independent evidence for1407/1110/1126/1006/1014/1005; the already verified Python extractor and map exports are a second oracle for the resource parsers. No live server account is used and no capture is modified.
+
+Scope:
+
+- Resource transport:1407 chunked resource assembly (actions9..16, kinds map-png/map-ref/map-images/map-data), ZIP member inflate with stored size/CRC check, map-images index and packed-image rebuild with the client's own RGB565 arithmetic. Bounded sizes, fail closed.
+- Map document: 5-byte header (cols, rows, cellWidth, cellHeight), row-major tiles `y*cols+x`, three bitsets (blocking, rotation, flight blocking), least-significant-bit-first per cell. Tile reference table from map-ref with piece widths2/3/7 and flags0x2000/0x4000/0x0800.
+- World packets:1110 identity;1126 action0 portals, action2 collision/flight updates, action3 tile replacement;1006/1082 action2 user info (id, name, look, hair, weapon, map x/y);1014 other player subset;1005 walk in both directions with the original `action*10000000 + direction*1000000 + x*1000 + y` packing and map id.
+- World state: authoritative map grid, user entity, other players, local step intent refused on blocked cells and outside bounds, server correction (action3) overrides local position, other players dropped beyond the original 24-cell window, portals as arrival markers only.
+- Render: three-pass tile order (immediate0x4000, queued0x0800, remaining statics, each sorted by y then x), per-piece transform/offset including rotation bit, images resolved from map-local decoded images first and the decoded original image set second, player drawn at its cell.
+- Local gateway: serves one genuinely captured map's resources over the same binary protocol, sends1110/1126/1006, accepts1005 and answers with authoritative position, so the flow is verifiable without the live server.
+
+Out of scope and must stay documented as missing: combat, items, NPC/quest dialogue, chat, sprite animation of characters and monsters, pathfinding, map switching through portals, live server acceptance. The player is drawn as a placeholder marker, not the original character sprite, because character sprite assembly (look/hair/weapon layering) is not part of this slice.
+
+Acceptance: map resource and reference parsers reproduce the already verified exports of a real captured map byte for byte; outbound1005/1014 byte parity against the original `Packet` class; malformed/oversized/out-of-bounds inputs rejected; world state unit tests for collision refusal, correction, window eviction and portal bounds; headless draw-plan test pinning the three-pass order and transforms; real GL probe that walks the player on the rendered captured map through the local gateway with a screenshot; full reactor build and independent review.

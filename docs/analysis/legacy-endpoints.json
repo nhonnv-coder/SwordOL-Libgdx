@@ -1,0 +1,48 @@
+{
+  "source_jar": "docs/files/VoLamHoiTu.jar",
+  "source_sha256": "16024c3ed0536b29217a67f657f110abc78549eae75ef6ac0bfdd0dc205b0ccd",
+  "evidence_type": "offline static decompilation and archive bytes; no reachability verified",
+  "automatic_connection_enabled": false,
+  "account": {
+    "configured": "http://180.169.17.16:13012",
+    "resource": "res/connect_b.o",
+    "resource_hex": "050240b40240a90111011004800032d4",
+    "decoded_lines": [180, 169, 17, 16, 13012],
+    "reader": "base.utils.OFileReader.readInteger, work.main.Engine.getHttpStr",
+    "network_mode_1_override": "work.main.Business.LoginServer explicitly replaces getHttpStr result with http://180.169.17.16:13012",
+    "fallback": "http://180.169.17.73:13012"
+  },
+  "wap_proxy": {
+    "url": "http://10.0.0.172:80",
+    "source": "work.api.Const.other_str[5], base.utils.HttpPoster constructor",
+    "probe_path": "/zy/zytest.php"
+  },
+  "game": {
+    "fixed_address": null,
+    "source": "work.main.CmdProcessor.processLoginBackCmd and Connect",
+    "opcode": 1052,
+    "response_parameters": {
+      "0": "account ID int",
+      "1": "authorization int",
+      "2": "HTTP/fast-game port int",
+      "3": "game server address string",
+      "4": "optional socket header byte 0",
+      "5": "optional socket header byte 1",
+      "6": "send-header flag byte",
+      "7": "socket port int",
+      "8": "alternate socket address string",
+      "9": "alternate port int",
+      "10": "account binding URL string",
+      "11": "try-game flag byte"
+    },
+    "mode_0": "HTTP proxy with serverIP=parameter3:parameter2",
+    "mode_1": "socket://parameter3:(parameter9 if nonzero else parameter7)",
+    "mode_2": "socket://parameter8:parameter7",
+    "fast_game": "socket://game-address:game-port from opcode1065 response"
+  },
+  "limitations": [
+    "Addresses are embedded historical configuration, not evidence of a currently operating server.",
+    "Gameplay address requires a saved response; it cannot be recovered as one fixed address from this artifact.",
+    "This configuration is evidence for optional response comparison only, never the new server default."
+  ]
+}

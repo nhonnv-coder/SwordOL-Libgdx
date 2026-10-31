@@ -1,0 +1,18 @@
+{
+  "bundle": "C:\\Users\\nhonn\\.workspace\\Game.SwordOL\\assets\\generated\\legacy-decoded.swordassets",
+  "bundleSha256": "a6beb55b0c3583874b74b1ac14eafabb8592be333b6ddf7dd74b1529794c4640",
+  "assetsVerified": 1521,
+  "types": {
+    "binary": 4,
+    "image": 1384,
+    "sprite": 61,
+    "ui": 72
+  },
+  "imagesDecodedByLibgdx": 1384,
+  "decodedPixels": 7081665,
+  "jsonDocumentsParsedStrictly": 137,
+  "spriteFrames": 3001,
+  "sixBytePlacementSprites": 1,
+  "uiControls": 605,
+  "scope": "Offline bundle integrity, strict JSON and native PNG decode; no sprite rendering, UI binding or server connection."
+}

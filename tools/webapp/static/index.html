@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SwordOL Studio</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><span class="mark"></span>SwordOL<span class="brand-sub">Studio</span></div>
+    <nav>
+      <button class="nav active" data-view="maps">◼ Maps</button>
+      <button class="nav" data-view="sprites">◻ Sprites &amp; Animation</button>
+    </nav>
+    <div class="side-foot"><button class="btn" id="reload">Nạp lại báo cáo</button><span id="stats">…</span></div>
+  </aside>
+
+  <main>
+    <!-- MAPS -->
+    <section class="view" id="view-maps">
+      <div class="list-pane">
+        <input id="map-search" class="search" placeholder="Tìm map…">
+        <div id="map-list" class="list"></div>
+      </div>
+      <div class="detail" id="map-detail">
+        <div class="empty">Chọn một map</div>
+      </div>
+    </section>
+
+    <!-- SPRITES -->
+    <section class="view hidden" id="view-sprites">
+      <div class="list-pane">
+        <input id="sprite-search" class="search" placeholder="Tìm sprite…">
+        <div id="sprite-list" class="list"></div>
+      </div>
+      <div class="detail" id="sprite-detail">
+        <div class="empty">Chọn một sprite</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+buildscript {
+    repositories { mavenCentral() }
+    dependencies { classpath 'com.mobidevelop.robovm:robovm-gradle-plugin:2.3.26' }
+}
+apply plugin: 'java'
+apply plugin: 'robovm'
+repositories { mavenCentral() }
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+sourceSets.main {
+    java.srcDirs += ['../client-core/src/main/java', '../asset-runtime/src/main/java']
+    resources.srcDirs += ['../client-core/src/main/resources', '../demo-bundle/src/main/resources', '.']
+    resources.exclude 'build/**', '.gradle/**', 'src/**'
+}
+dependencies {
+    implementation 'com.mobidevelop.robovm:robovm-rt:2.3.26'
+    implementation 'com.mobidevelop.robovm:robovm-cocoatouch:2.3.26'
+    implementation 'com.badlogicgames.gdx:gdx:1.14.2'
+    implementation 'com.badlogicgames.gdx:gdx-backend-robovm:1.14.2'
+    implementation 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-ios'
+    implementation 'org.puremvc:puremvc:2.2'
+    implementation 'com.google.code.gson:gson:2.13.2'
+}
+robovm { archs = 'arm64'; iosSignIdentity = ''; iosProvisioningProfile = '' }
