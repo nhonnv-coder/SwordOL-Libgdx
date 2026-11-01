@@ -11,6 +11,7 @@ import java.util.Collections;
 import vn.swordol.assets.runtime.UiLayout;
 import vn.swordol.client.render.ImageSet;
 import vn.swordol.client.ui.NativeLoginGame;
+import vn.swordol.client.ui.legacy.LegacyImages;
 import vn.swordol.client.ui.legacy.LegacySkin;
 import vn.swordol.client.ui.legacy.LegacyWindow;
 
@@ -42,7 +43,8 @@ public final class LegacyWindowProbe {
               UiLayout layout = UiLayout.read(document);
               // The original draws every window on this one surface, so the viewport is the window.
               stage = new Stage(new FitViewport(layout.width(), layout.height()));
-              LegacyWindow window = new LegacyWindow(layout, LegacySkin.create());
+              LegacyImages pictures = new LegacyImages(images);
+              LegacyWindow window = new LegacyWindow(layout, LegacySkin.create(), pictures);
               stage.addActor(window);
               System.out.println(
                   "LEGACY_WINDOW "
@@ -52,7 +54,9 @@ public final class LegacyWindowProbe {
                       + "x"
                       + layout.height()
                       + " controls="
-                      + layout.controls().size());
+                      + layout.controls().size()
+                      + " missingImages="
+                      + pictures.missingImages());
             } catch (Exception ex) {
               throw new AssertionError("Legacy window probe failed", ex);
             }

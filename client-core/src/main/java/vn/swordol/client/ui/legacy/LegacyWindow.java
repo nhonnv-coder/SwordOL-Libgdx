@@ -1,8 +1,10 @@
 package vn.swordol.client.ui.legacy;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Group;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -29,16 +31,29 @@ public final class LegacyWindow extends Group {
   private final Map<Integer, Actor> actors = new LinkedHashMap<>();
 
   public LegacyWindow(UiLayout layout, Skin skin) {
+    this(layout, skin, null);
+  }
+
+  /**
+   * @param images the window's own pictures, or null to draw the plain surfaces of the skin
+   */
+  public LegacyWindow(UiLayout layout, Skin skin, LegacyImages images) {
     this.layout = layout;
     setSize(layout.width(), layout.height());
     for (UiLayout.Control control : layout.controls()) {
-      Actor actor = build(control, skin);
+      float top = LegacyPlacement.stageY(layout.height(), control.y(), control.height());
+      TextureRegion cell =
+          images == null ? null : images.cell(control.imageId(), control.imageIndex());
+      if (cell != null) {
+        // ImagePointer draws the cell at the control's top left, at its own size, not stretched.
+        Image picture = new Image(cell);
+        picture.setPosition(control.x(), top + control.height() - cell.getRegionHeight());
+        picture.setSize(cell.getRegionWidth(), cell.getRegionHeight());
+        addActor(picture);
+      }
+      Actor actor = build(control, skin, cell != null);
       if (actor == null) continue;
-      actor.setBounds(
-          control.x(),
-          LegacyPlacement.stageY(layout.height(), control.y(), control.height()),
-          control.width(),
-          control.height());
+      actor.setBounds(control.x(), top, control.width(), control.height());
       actors.put(control.id(), actor);
       addActor(actor);
     }
@@ -68,9 +83,16 @@ public final class LegacyWindow extends Group {
     return actor instanceof Label ? (Label) actor : null;
   }
 
-  private static Actor build(UiLayout.Control control, Skin skin) {
+  private static Actor build(UiLayout.Control control, Skin skin, boolean hasPicture) {
     switch (control.kind()) {
       case BUTTON:
+        if (hasPicture) {
+          // The picture is the button's surface, as it is in the original; only the text is added.
+          if (control.text().isEmpty()) return null;
+          Label caption = new Label(control.text(), skin);
+          caption.setColor(colour(control.textColor()));
+          return caption;
+        }
         TextButton button = new TextButton(control.text(), skin);
         button.getLabel().setColor(colour(control.textColor()));
         return button;

@@ -101,6 +101,7 @@ public final class UiLayout {
     JsonElement text = source.get("text");
     JsonElement colour = source.get("text_color");
     JsonElement image = source.get("image_id");
+    JsonElement imageIndex = source.get("image_index");
     JsonElement limit = source.get("char_limit");
     return new Control(
         (int) RuntimeJson.integer(member(source, "id"), "control id"),
@@ -112,6 +113,7 @@ public final class UiLayout {
         text == null || text.isJsonNull() ? "" : RuntimeJson.string(text, "control text"),
         colour == null ? 0 : (int) RuntimeJson.integer(colour, "control text colour"),
         image == null ? 0 : (int) RuntimeJson.integer(image, "control image"),
+        imageIndex == null ? 0 : (int) RuntimeJson.integer(imageIndex, "control image index"),
         limit == null ? 0 : (int) RuntimeJson.integer(limit, "control char limit"));
   }
 
@@ -166,7 +168,7 @@ public final class UiLayout {
 
   /** One placed control, in the original's own coordinate space. */
   public static final class Control {
-    private final int id, x, y, width, height, textColor, imageId, charLimit;
+    private final int id, x, y, width, height, textColor, imageId, imageIndex, charLimit;
     private final Kind kind;
     private final String text;
 
@@ -180,6 +182,7 @@ public final class UiLayout {
         String text,
         int textColor,
         int imageId,
+        int imageIndex,
         int charLimit) {
       this.id = id;
       this.kind = kind;
@@ -190,6 +193,7 @@ public final class UiLayout {
       this.text = text;
       this.textColor = textColor;
       this.imageId = imageId;
+      this.imageIndex = imageIndex;
       this.charLimit = charLimit;
     }
 
@@ -229,6 +233,11 @@ public final class UiLayout {
     /** The legacy image this control draws, or 0 when it draws none. */
     public int imageId() {
       return imageId;
+    }
+
+    /** Which cell of that image the control draws; ImagePointer steps along a strip by this. */
+    public int imageIndex() {
+      return imageIndex;
     }
 
     public int charLimit() {
