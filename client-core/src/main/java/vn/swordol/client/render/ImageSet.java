@@ -84,6 +84,22 @@ public final class ImageSet implements TileImages.Source {
     return null;
   }
 
+  /**
+   * The decoded layout of one original window, or null when no source holds it. A bundle keeps it
+   * under {@code legacy.ui.<id>}; a directory of images has them in the sibling {@code legacy-ui}
+   * directory the decoders write.
+   */
+  public byte[] readUi(int windowId) throws IOException {
+    if (bundle != null) {
+      return bundle.read("legacy.ui." + windowId);
+    }
+    if (directory != null) {
+      File file = new File(directory.getParentFile(), "legacy-ui/" + windowId + ".ui.json");
+      return file.isFile() ? readFully(file) : null;
+    }
+    return null;
+  }
+
   public boolean hasOriginalSet() {
     return bundle != null || directory != null;
   }

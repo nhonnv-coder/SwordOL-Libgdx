@@ -2,13 +2,13 @@ package vn.swordol.client.ui;
 
 import com.badlogic.gdx.*;
 import com.badlogic.gdx.graphics.*;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.scenes.scene2d.*;
 import com.badlogic.gdx.scenes.scene2d.ui.*;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import vn.swordol.client.modules.login.*;
+import vn.swordol.client.ui.legacy.LegacySkin;
 import vn.swordol.protocol.wire.LoginPackets;
 
 /** Native Scene2D authentication/role UI; network is only initiated by explicit input. */
@@ -33,7 +33,7 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
   public void create() {
     stage = new Stage(new FitViewport(1060, 720));
     Gdx.input.setInputProcessor(stage);
-    skin = createSkin();
+    skin = LegacySkin.create();
     root = new Table();
     root.setFillParent(true);
     root.pad(32);
@@ -212,44 +212,6 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
       default:
         return "Cần kiểm tra kết nối";
     }
-  }
-
-  private Skin createSkin() {
-    Skin result = new Skin();
-    BitmapFont font = new BitmapFont(Gdx.files.classpath("fonts/native-ui.fnt"));
-    result.add("font", font);
-    Pixmap white = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-    white.setColor(Color.WHITE);
-    white.fill();
-    result.add("white", new Texture(white));
-    white.dispose();
-    result.add("default", new Label.LabelStyle(font, new Color(.85f, .9f, .96f, 1)));
-    TextButton.TextButtonStyle button = new TextButton.TextButtonStyle();
-    button.font = font;
-    button.fontColor = Color.WHITE;
-    button.disabledFontColor = Color.GRAY;
-    button.up = result.newDrawable("white", new Color(.14f, .27f, .37f, 1));
-    button.down = result.newDrawable("white", new Color(.24f, .44f, .55f, 1));
-    button.disabled = result.newDrawable("white", new Color(.1f, .14f, .18f, 1));
-    result.add("default", button);
-    TextField.TextFieldStyle field = new TextField.TextFieldStyle();
-    field.font = font;
-    field.fontColor = Color.WHITE;
-    field.background = result.newDrawable("white", new Color(.09f, .14f, .2f, 1));
-    field.cursor = result.newDrawable("white", Color.CYAN);
-    field.selection = result.newDrawable("white", Color.DARK_GRAY);
-    result.add("default", field);
-    List.ListStyle list = new List.ListStyle();
-    list.font = font;
-    list.fontColorSelected = Color.WHITE;
-    list.fontColorUnselected = Color.LIGHT_GRAY;
-    list.selection = button.down;
-    ScrollPane.ScrollPaneStyle scroll = new ScrollPane.ScrollPaneStyle();
-    scroll.background = field.background;
-    SelectBox.SelectBoxStyle select =
-        new SelectBox.SelectBoxStyle(font, Color.WHITE, field.background, scroll, list);
-    result.add("default", select);
-    return result;
   }
 
   @Override
