@@ -45,26 +45,32 @@ public final class LoginPackets {
         .build();
   }
 
-  /** CustomScreen refuses any registration box under six characters with other_str[583]. */
-  public static final int REGISTER_FIELD_MINIMUM = 6;
+  /**
+   * The registration window states its own rule: "Tài khoản và mật khẩu, tổ hợp từ 6~13 chữ số",
+   * and CustomScreen refuses anything under six with other_str[583]. The edit controls of window
+   * 114 carry char_limit 13 for the account and password boxes.
+   */
+  public static final int REGISTER_FIELD_MINIMUM = 6, REGISTER_FIELD_LIMIT = 13;
 
   /**
-   * Business.initRegisterPacket over the account channel, the branch openRegisterWnd(0) takes. The
-   * third box is sent as the screen collects it; only the first two are ever read back, as the
-   * account and password of the login screen, so this does not name it.
+   * Business.initRegisterPacket over the account channel, the branch openRegisterWnd(0) takes.
+   * Window 114 labels its three boxes "Tài khoản:", "Mật khẩu:" and "Trùng lặp:", so the third is
+   * the password typed again; the client sends it rather than comparing it itself.
    *
    * <p>The two identity ints are zero here: the original reads them from PackageID.o and its own
    * user file, neither of which this build ships.
    */
-  public static byte[] register(String account, String password, String third) {
-    for (String field : new String[] {account, password, third})
-      if (field == null || field.length() < REGISTER_FIELD_MINIMUM)
-        throw new IllegalArgumentException("Every registration field needs six characters");
+  public static byte[] register(String account, String password, String repeated) {
+    for (String field : new String[] {account, password, repeated})
+      if (field == null
+          || field.length() < REGISTER_FIELD_MINIMUM
+          || field.length() > REGISTER_FIELD_LIMIT)
+        throw new IllegalArgumentException("Every registration field needs 6 to 13 characters");
     return new WireWriter(1055)
         .signedByte(0)
         .text(account)
         .text(password)
-        .text(third)
+        .text(repeated)
         .text("")
         .integer(0)
         .integer(0)

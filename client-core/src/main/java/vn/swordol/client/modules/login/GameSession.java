@@ -135,7 +135,7 @@ public final class GameSession implements AutoCloseable {
    *
    * <p>Takes ownership of password contents and wipes the caller's array.
    */
-  public synchronized void register(String account, char[] password, String third) {
+  public synchronized void register(String account, char[] password, String repeated) {
     ensureOpen();
     Objects.requireNonNull(password);
     if (endpoint == null) throw new IllegalStateException("Load the server list first");
@@ -143,7 +143,7 @@ public final class GameSession implements AutoCloseable {
       throw new IllegalStateException("Register from the account screen");
     final byte[] request;
     try {
-      request = LoginPackets.register(account, new String(password), third);
+      request = LoginPackets.register(account, new String(password), repeated);
     } finally {
       Arrays.fill(password, '\0');
     }

@@ -101,6 +101,9 @@ public class LoginPacketsTest {
     assertRegisterRejected("short", "password01", "answer0001");
     assertRegisterRejected("account01", "pw", "answer0001");
     assertRegisterRejected("account01", "password01", "a");
+    // Window 114 caps every box at thirteen: "tổ hợp từ 6~13 chữ số".
+    assertRegisterRejected("fourteenchars1", "password01", "answer0001");
+    assertRegisterRejected("account01", "password01", "fourteenchars1");
     assertRegisterRejected(null, "password01", "answer0001");
   }
 

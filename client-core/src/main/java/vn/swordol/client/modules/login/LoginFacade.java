@@ -169,9 +169,9 @@ public final class LoginFacade extends Facade implements AutoCloseable {
                   }
                 }
 
-                public void register(String account, char[] password, String third) {
+                public void register(String account, char[] password, String repeated) {
                   try {
-                    intent(() -> network.session.register(account, password.clone(), third));
+                    intent(() -> network.session.register(account, password.clone(), repeated));
                   } finally {
                     Arrays.fill(password, '\0');
                   }

@@ -61,8 +61,8 @@ public final class NativeLoginGame extends ApplicationAdapter implements LoginVi
     roles = new SelectBox<>(skin);
     row(root, "Nhân vật", roles);
     registerForm = new RegisterForm(skin);
-    registerForm.setListener((account, password, third) -> {
-      if (actions != null) actions.register(account, password, third);
+    registerForm.setListener((account, password, repeated) -> {
+      if (actions != null) actions.register(account, password, repeated);
     });
     root.add(registerForm).colspan(2).growX().padBottom(14).row();
     newRole = new NewRoleForm(skin);

@@ -9,7 +9,7 @@ public interface LoginView {
     void login(LoginPackets.ServerLine server, String account, char[] password);
 
     /** Registers an account on the endpoint already loaded; it does not sign in. */
-    void register(String account, char[] password, String third);
+    void register(String account, char[] password, String repeated);
 
     /**
      * Creates a character the way the original creation screen does.

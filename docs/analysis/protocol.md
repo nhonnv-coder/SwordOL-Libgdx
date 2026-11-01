@@ -200,8 +200,13 @@ original client; neither was implemented in the native rebuild before this note.
 `Business.openRegisterWnd(status)` opens control screen 114. `CustomScreen` (around line 1749)
 collects three edit controls, `114007`/`114008`/`114009`, and **refuses any value shorter than six
 characters** (`Const.other_str[583]`). They are stored as `Business.m_loginStr[0..2]`; the response
-path fills the login screen's account and password fields from `[0]` and `[1]`, which is what
-identifies the first two. The third field's meaning is not established by the client code.
+path fills the login screen's account and password fields from `[0]` and `[1]`.
+
+The decoded layout of window 114 names all three and states the rule the note at the bottom of the
+window carries: `114007` is "Tài khoản:", `114008` "Mật khẩu:" and `114009` "Trùng lặp:", so the
+third box is the password typed again, which the client sends without comparing it itself. Its edit
+controls carry `char_limit` 13 and the window's own text reads "Chú ý: Tài khoản và mật khẩu, tổ hợp
+từ 6~13 chữ số", so the accepted length is six to thirteen, not merely six or more.
 
 Which opcode is sent depends on the screen's status variable: status `0` calls
 `LoginServer(false, null)` then sends **1055** over `exec_A` (the HTTP account channel) and starts

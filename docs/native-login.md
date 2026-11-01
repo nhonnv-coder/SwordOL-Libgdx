@@ -15,7 +15,7 @@ Nếu dùng dịch vụ account khác do người dùng chọn, nhập URL trự
 
 Hai bước này đã có, theo đúng packet của client gốc (xem `docs/analysis/protocol.md`):
 
-- **Đăng ký** dùng opcode `1055` trên kênh HTTP account, thân gói theo `Business.initRegisterPacket`. Mỗi ô cần tối thiểu6 ký tự, đúng luật `CustomScreen` kiểm trước khi gửi. Đăng ký xong **không** tự đăng nhập; màn hình báo kết quả và bạn đăng nhập bằng tài khoản mới. Server local chỉ nhận `1055` khi có `Registrar`; `GatewayMain` cấp một bộ nhớ tạm trong tiến trình, băm bằng salt của phiên, tối đa32 tài khoản và mất khi tắt server.
+- **Đăng ký** dùng opcode `1055` trên kênh HTTP account, thân gói theo `Business.initRegisterPacket`. Ba ô là "Tài khoản:", "Mật khẩu:" và "Trùng lặp:" (nhập lại mật khẩu) theo layout gốc của cửa sổ114; mỗi ô6~13 ký tự, đúng chú ý in trong chính cửa sổ đó. Client gửi ô thứ ba đi chứ không tự so. Đăng ký xong **không** tự đăng nhập; màn hình báo kết quả và bạn đăng nhập bằng tài khoản mới. Server local chỉ nhận `1055` khi có `Registrar`; `GatewayMain` cấp một bộ nhớ tạm trong tiến trình, băm bằng salt của phiên, tối đa32 tài khoản và mất khi tắt server.
 - **Tạo nhân vật** dùng opcode `1001` trên kênh TCP game, thân gói theo `Business.NewRoleWnd_EditOK`. Tên tối đa10 ký tự,3 ô nhân vật. Môn phái và giới tính lấy từ bảng `newRoleLookFaceDatID`: môn phái9 và10 không tạo được, và môn phái nào thiếu một giới thì giới đó không hiện. Client **không** tự thêm nhân vật vào danh sách; nó vẽ lại theo gói `1080` server trả về. Look face do server quyết theo bảng, không lấy từ request.
 
 Tên môn phái hiển thị là số thứ tự. Client gốc không hard-code tên: `NewRoleWnd_Flush` hỏi server bằng gói `1602` rồi hiện chữ nhận được; phần đó chưa làm.

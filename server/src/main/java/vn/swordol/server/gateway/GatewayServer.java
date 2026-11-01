@@ -22,7 +22,7 @@ public final class GatewayServer implements AutoCloseable {
 
   /** Creates a local account, or returns null when the name is taken or the server refuses it. */
   public interface Registrar {
-    Account register(String name, char[] password, String third);
+    Account register(String name, char[] password, String repeated);
   }
 
   private final Authenticator authenticator;
@@ -265,7 +265,7 @@ public final class GatewayServer implements AutoCloseable {
   private byte[] registerAccount(Packet packet) throws IOException {
     if (packet.fields().size() != 8) throw new IOException("Invalid registration schema");
     String name = LoginPackets.text(packet, 1);
-    String third = LoginPackets.text(packet, 3);
+    String repeated = LoginPackets.text(packet, 3);
     char[] password = LoginPackets.text(packet, 2).toCharArray();
     Account created;
     try {
@@ -274,9 +274,10 @@ public final class GatewayServer implements AutoCloseable {
           store == null
                   || name.length() < LoginPackets.REGISTER_FIELD_MINIMUM
                   || password.length < LoginPackets.REGISTER_FIELD_MINIMUM
-                  || third.length() < LoginPackets.REGISTER_FIELD_MINIMUM
+                  || repeated.length() < LoginPackets.REGISTER_FIELD_MINIMUM
+                  || name.length() > LoginPackets.REGISTER_FIELD_LIMIT
               ? null
-              : store.register(name, password, third);
+              : store.register(name, password, repeated);
     } finally {
       Arrays.fill(password, '\0');
     }
